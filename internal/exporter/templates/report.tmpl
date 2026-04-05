@@ -1,0 +1,759 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>SQL 数据报表</title>
+    <style>
+        :root {
+            --bg-primary: #0d1117;
+            --bg-secondary: #161b22;
+            --bg-tertiary: #21262d;
+            --text-primary: #c9d1d9;
+            --text-secondary: #8b949e;
+            --border-color: #30363d;
+            --accent-color: #58a6ff;
+            --accent-hover: #79c0ff;
+            --success-color: #3fb950;
+            --warning-color: #d29922;
+        }
+        
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        
+        body {
+            font-family: 'SF Mono', 'Fira Code', 'JetBrains Mono', monospace;
+            background: var(--bg-primary);
+            color: var(--text-primary);
+            line-height: 1.6;
+            min-height: 100vh;
+        }
+        
+        .container {
+            max-width: 100%;
+            padding: 24px;
+        }
+        
+        .header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 24px;
+            padding-bottom: 16px;
+            border-bottom: 1px solid var(--border-color);
+        }
+        
+        .header h1 {
+            font-size: 1.5rem;
+            font-weight: 600;
+            background: linear-gradient(135deg, var(--accent-color), var(--success-color));
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            background-clip: text;
+        }
+        
+        .stats {
+            display: flex;
+            gap: 24px;
+            font-size: 0.875rem;
+            color: var(--text-secondary);
+        }
+        
+        .stats span {
+            display: flex;
+            align-items: center;
+            gap: 6px;
+        }
+        
+        .stats .count {
+            color: var(--accent-color);
+            font-weight: 600;
+        }
+        
+        .table-container {
+            background: var(--bg-secondary);
+            border: 1px solid var(--border-color);
+            border-radius: 8px;
+            overflow: hidden;
+        }
+        
+        .table-wrapper {
+            overflow: auto;
+            max-height: calc(100vh - 200px);
+        }
+        
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            font-size: 0.875rem;
+        }
+        
+        th, td {
+
+            padding: 12px 16px;
+            text-align: left;
+            border-bottom: 1px solid var(--border-color);
+        }
+        
+        th {
+            white-space: nowrap;
+            background: var(--bg-tertiary);
+            font-weight: 600;
+            color: var(--text-primary);
+            position: sticky;
+            top: 0;
+            z-index: 10;
+        }
+        
+        tr:hover {
+            background: var(--bg-tertiary);
+        }
+        
+        tr:last-child td {
+            border-bottom: none;
+        }
+        
+        .cell-text {
+            display: -webkit-box;
+            -webkit-line-clamp: 3;
+            -webkit-box-orient: vertical;
+            width: max-content;
+            max-width: 400px;
+            word-break: break-word;
+            overflow: hidden;
+            vertical-align: middle;
+        }
+        
+        .cell-link {
+            display: -webkit-box;
+            -webkit-line-clamp: 3;
+            -webkit-box-orient: vertical;
+            width: max-content;
+            max-width: 400px;
+            word-break: break-word;
+            overflow: hidden;
+            vertical-align: middle;
+            color: var(--accent-color);
+            text-decoration: none;
+            transition: color 0.2s;
+        }
+        
+        .cell-link:hover {
+
+            text-decoration: underline;
+        }
+        
+        .cell-image {
+            position: relative;
+            border-radius: 4px;
+            overflow: hidden;
+        }
+        
+        .cell-image img {
+            border-radius: 4px;
+            cursor: pointer;
+            object-fit: contain;
+            display: block;
+        }
+        
+
+        
+        .cell-video-container {
+            display: inline-block;
+            border-radius: 4px;
+            overflow: hidden;
+        }
+        
+        .cell-video-container video {
+            cursor: pointer;
+            border-radius: 4px;
+        }
+        
+        .binding-action {
+            margin-top: 6px;
+        }
+        
+        .preview-trigger {
+            display: inline-flex;
+            align-items: center;
+            gap: 4px;
+            padding: 4px 8px;
+            background: var(--bg-tertiary);
+            border: 1px solid var(--border-color);
+            border-radius: 4px;
+            color: var(--text-secondary);
+            font-size: 0.75rem;
+            cursor: pointer;
+            transition: all 0.2s;
+        }
+        
+        .preview-trigger:hover {
+            border-color: var(--accent-color);
+            color: var(--accent-color);
+        }
+        
+        .download-btn {
+            display: inline-flex;
+            align-items: center;
+            gap: 4px;
+            padding: 4px 8px;
+            background: var(--accent-color);
+            border: none;
+            border-radius: 4px;
+            color: var(--bg-primary);
+            font-size: 0.75rem;
+            font-weight: 600;
+            cursor: pointer;
+            text-decoration: none;
+            transition: background 0.2s;
+            margin-left: 8px;
+        }
+        
+        .download-btn:hover {
+            background: var(--accent-hover);
+        }
+        
+        /* 分页 */
+        .pagination {
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            gap: 8px;
+            padding: 16px;
+            border-top: 1px solid var(--border-color);
+        }
+        
+        .pagination button {
+            padding: 8px 16px;
+            background: var(--bg-tertiary);
+            border: 1px solid var(--border-color);
+            border-radius: 6px;
+            color: var(--text-primary);
+            font-family: inherit;
+            font-size: 0.875rem;
+            cursor: pointer;
+            transition: all 0.2s;
+        }
+        
+        .pagination button:hover:not(:disabled) {
+            border-color: var(--accent-color);
+            color: var(--accent-color);
+        }
+        
+        .pagination button:disabled {
+            opacity: 0.5;
+            cursor: not-allowed;
+        }
+        
+        .pagination .page-info {
+            color: var(--text-secondary);
+            font-size: 0.875rem;
+            min-width: 120px;
+            text-align: center;
+        }
+        
+        .pagination select {
+            padding: 8px 12px;
+            background: var(--bg-tertiary);
+            border: 1px solid var(--border-color);
+            border-radius: 6px;
+            color: var(--text-primary);
+            font-family: inherit;
+            font-size: 0.875rem;
+            cursor: pointer;
+        }
+        
+        /* 预览浮窗 */
+        .preview-modal {
+            display: none;
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(0, 0, 0, 0.8);
+            z-index: 1000;
+            justify-content: center;
+            align-items: center;
+        }
+        
+        .preview-modal.active {
+            display: flex;
+        }
+        
+        .preview-content {
+            max-width: 90%;
+            max-height: 90%;
+            position: relative;
+        }
+        
+        .preview-content img,
+        .preview-content video {
+            max-width: 100%;
+            max-height: 80vh;
+            border-radius: 8px;
+        }
+        
+        .preview-close {
+            position: absolute;
+            top: -40px;
+            right: 0;
+            background: none;
+            border: none;
+            color: var(--text-primary);
+            font-size: 2rem;
+            cursor: pointer;
+        }
+        
+        /* 悬浮预览 */
+        .hover-preview {
+            position: fixed;
+            z-index: 100;
+            background: var(--bg-secondary);
+            border: 1px solid var(--border-color);
+            border-radius: 8px;
+            padding: 8px;
+            box-shadow: 0 8px 32px rgba(0, 0, 0, 0.4);
+            display: none;
+        }
+        
+        .hover-preview.active {
+            display: block;
+        }
+        
+        .hover-preview img,
+        .hover-preview video {
+            max-width: 400px;
+            max-height: 300px;
+            border-radius: 4px;
+        }
+        
+        /* 空状态 */
+        .empty-state {
+            text-align: center;
+            padding: 48px;
+            color: var(--text-secondary);
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <h1>SQL 数据报表</h1>
+            <div class="stats">
+                <span>总记录数：<span class="count" id="totalCount">0</span></span>
+                <span>当前页：<span class="count" id="currentPageInfo">1</span></span>
+            </div>
+        </div>
+        
+        <div class="table-container">
+            <div class="table-wrapper">
+                <table id="dataTable">
+                    <thead id="tableHead"></thead>
+                    <tbody id="tableBody"></tbody>
+                </table>
+            </div>
+            
+            <div class="pagination" id="pagination">
+                <button id="prevBtn" onclick="prevPage()">上一页</button>
+                <span class="page-info" id="pageInfo">第 1 页</span>
+                <button id="nextBtn" onclick="nextPage()">下一页</button>
+                <select id="pageSizeSelect" onchange="changePageSize()">
+                    <option value="20">20 条/页</option>
+                    <option value="50" selected>50 条/页</option>
+                    <option value="100">100 条/页</option>
+                    <option value="200">200 条/页</option>
+                </select>
+            </div>
+        </div>
+    </div>
+    
+    <!-- 预览模态框 -->
+    <div class="preview-modal" id="previewModal" onclick="closePreview(event)">
+        <div class="preview-content" id="previewContent">
+            <button class="preview-close" onclick="closePreview()">&times;</button>
+        </div>
+    </div>
+    
+    <!-- 悬浮预览 -->
+    <div class="hover-preview" id="hoverPreview"></div>
+
+    <script>
+        // 后端注入的数据
+        const __REPORT_COLUMNS__ = {{.ColumnsJSON}};
+        const __REPORT_DATA__ = {{.DataJSON}};
+        
+        // 状态管理
+        let currentPage = 1;
+        let pageSize = 50;
+        const totalRows = __REPORT_DATA__.length;
+        
+        // 列绑定映射：目标列索引 -> 源列信息数组
+        const bindingMap = {};
+        
+        // 初始化
+        function init() {
+            buildBindingMap();
+            renderHeader();
+            renderData();
+            updatePagination();
+            document.getElementById('totalCount').textContent = totalRows;
+        }
+        
+        // 构建列绑定映射
+        function buildBindingMap() {
+            __REPORT_COLUMNS__.forEach((col, colIdx) => {
+                if (col.meta && col.meta.HTML) {
+                    const htmlMeta = col.meta.HTML;
+                    const args = htmlMeta.Args || {};
+                    
+                    // 确定目标列索引
+                    let targetColIdx = -1;
+                    if (args.bindToSelf === 'true') {
+                        // 绑定到自己
+                        targetColIdx = colIdx;
+                        console.log(`列 ${colIdx} (${col.displayName}) 绑定到自己`);
+                    } else if (args.bindColumn) {
+                        // 绑定到指定列（优先匹配 displayName）
+                        const bindCol = args.bindColumn.trim();
+                        targetColIdx = __REPORT_COLUMNS__.findIndex(
+                            c => c.displayName.trim() === bindCol
+                        );
+                        console.log(`列 ${colIdx} (${col.displayName}) 绑定到 "${bindCol}", 找到索引: ${targetColIdx}`);
+                    }
+                    
+                    if (targetColIdx !== -1 && args.interactionType) {
+                        if (!bindingMap[targetColIdx]) {
+                            bindingMap[targetColIdx] = [];
+                        }
+                        // 根据交互类型设置默认 hint
+                        const defaultHint = args.interactionType === 'D' ? '下载' : '预览';
+                        bindingMap[targetColIdx].push({
+                            sourceColIdx: colIdx,
+                            type: args.type || 'T',
+                            interactionType: args.interactionType,
+                            hint: args.hint || defaultHint,
+                            bindToSelf: args.bindToSelf === 'true'
+                        });
+                        console.log(`  -> 添加绑定到 bindingMap[${targetColIdx}]`);
+                    } else if (args.bindColumn && targetColIdx === -1) {
+                        console.log(`  -> 警告: 未找到目标列 "${args.bindColumn}"`);
+                    } else if (args.bindColumn && !args.interactionType) {
+                        console.log(`  -> 警告: 缺少 interactionType`);
+                    }
+                }
+            });
+            // 调试：打印绑定映射
+            console.log('最终 bindingMap:', JSON.stringify(bindingMap, null, 2));
+        }
+        
+        // 渲染表头
+        function renderHeader() {
+            const thead = document.getElementById('tableHead');
+            let html = '<tr>';
+            
+            __REPORT_COLUMNS__.forEach((col, idx) => {
+                // 如果是纯绑定列（有交互绑定到其他列），则隐藏
+                if (col.meta && col.meta.HTML) {
+                    const args = col.meta.HTML.Args || {};
+                    if (args.bindColumn) {
+                        return; // 跳过这列的表头
+                    }
+                }
+                html += `<th>${escapeHtml(col.displayName)}</th>`;
+            });
+            
+            html += '</tr>';
+            thead.innerHTML = html;
+        }
+        
+        // 渲染数据
+        function renderData() {
+            const tbody = document.getElementById('tableBody');
+            const start = (currentPage - 1) * pageSize;
+            const end = Math.min(start + pageSize, totalRows);
+            const pageData = __REPORT_DATA__.slice(start, end);
+            
+            if (pageData.length === 0) {
+                tbody.innerHTML = '<tr><td colspan="100" class="empty-state">暂无数据</td></tr>';
+                return;
+            }
+            
+            let html = '';
+            
+            pageData.forEach((row, rowIdx) => {
+                html += '<tr>';
+                
+                __REPORT_COLUMNS__.forEach((col, colIdx) => {
+                    // 跳过绑定列
+                    if (col.meta && col.meta.HTML) {
+                        const args = col.meta.HTML.Args || {};
+                        if (args.bindColumn) {
+                            return;
+                        }
+                    }
+                    
+                    const value = row[colIdx];
+                    const actualRowIdx = start + rowIdx;
+                    html += `<td>${renderCell(value, col, colIdx, actualRowIdx, row)}</td>`;
+                });
+                
+                html += '</tr>';
+            });
+            
+            tbody.innerHTML = html;
+        }
+        
+        // 渲染单元格
+        function renderCell(value, col, colIdx, rowIdx, row) {
+            if (value === null || value === undefined) {
+                return '<span class="text-secondary">-</span>';
+            }
+            
+            let cellHtml = '';
+            const isUrl = isValidUrl(value);
+            
+            // 检查是否绑定到自己（不渲染原始内容，只显示预览按钮）
+            const isBoundToSelf = col.meta && col.meta.HTML && col.meta.HTML.Args && col.meta.HTML.Args.bindToSelf === 'true';
+            
+            // 如果不是绑定到自己，则渲染原始内容
+            if (!isBoundToSelf) {
+                if (col.meta && col.meta.HTML) {
+                    const args = col.meta.HTML.Args || {};
+                    const type = args.type || 'T';
+                    
+                    switch (type) {
+                        case 'I':
+                            // 检查是否有 H 限制，默认高度 100px，宽度不限制
+                            let imgHeight = '100px';
+                            if (col.meta && col.meta.H) {
+                                const h = col.meta.H.Args || {};
+                                if (h.height) imgHeight = h.height;
+                            }
+                            let containerStyle = `height:${imgHeight};`;
+                            let imgStyle = `object-fit:contain;height:${imgHeight};`;
+                            cellHtml = `<div class="cell-image" style="${containerStyle}">
+                                <img src="${escapeHtml(value)}" style="${imgStyle}" onclick="showPreview('${escapeJs(value)}', 'image')" 
+                                     onerror="this.parentElement.innerHTML='<span class=\\'text-secondary\\'>加载失败</span>'" />
+                            </div>`;
+                            break;
+                        case 'V':
+                            // 检查是否有 H 限制，默认高度 100px，宽度不限制
+                            let videoHeight = '100px';
+                            if (col.meta && col.meta.H) {
+                                const h = col.meta.H.Args || {};
+                                if (h.height) videoHeight = h.height;
+                            }
+                            cellHtml = `<div class="cell-video-container" style="height:${videoHeight};">
+                                <video src="${escapeHtml(value)}" style="height:${videoHeight};object-fit:contain;" 
+                                       onclick="showPreview('${escapeJs(value)}', 'video')" muted></video>
+                            </div>`;
+                            break;
+                        case 'L':
+                            // 检查是否需要下载
+                            const downloadL = col.meta && col.meta.URL && col.meta.URL.Args && col.meta.URL.Args.download === 'true';
+                            if (downloadL) {
+                                let filenameL = 'download';
+                                try {
+                                    const urlPathL = new URL(value).pathname;
+                                    filenameL = urlPathL.split('/').pop() || 'download';
+                                } catch (e) {}
+                                cellHtml = `<span class="cell-link" style="cursor:pointer" onclick="downloadFile('${escapeJs(value)}', '${escapeJs(filenameL)}')">⬇ ${escapeHtml(value)}</span>`;
+                            } else {
+                                cellHtml = `<a class="cell-link" href="${escapeHtml(value)}" target="_blank">${escapeHtml(value)}</a>`;
+                            }
+                            break;
+                        default:
+                            cellHtml = `<span class="cell-text">${escapeHtml(value)}</span>`;
+                    }
+                } else if (isUrl) {
+                    // URL 列自动转换为链接，检查是否需要下载
+                    const downloadUrl = col.meta && col.meta.URL && col.meta.URL.Args && col.meta.URL.Args.download === 'true';
+                    if (downloadUrl) {
+                        let filenameUrl = 'download';
+                        try {
+                            const urlPathUrl = new URL(value).pathname;
+                            filenameUrl = urlPathUrl.split('/').pop() || 'download';
+                        } catch (e) {}
+                        cellHtml = `<span class="cell-link" style="cursor:pointer" onclick="downloadFile('${escapeJs(value)}', '${escapeJs(filenameUrl)}')">⬇ ${escapeHtml(value)}</span>`;
+                    } else {
+                        cellHtml = `<a class="cell-link" href="${escapeHtml(value)}" target="_blank">${escapeHtml(value)}</a>`;
+                    }
+                } else {
+                    cellHtml = `<span class="cell-text">${escapeHtml(value)}</span>`;
+                }
+            }
+            
+            // 检查是否有绑定到此列的其他列（包括绑定到自己）
+            // bindToSelf 优先显示
+            if (bindingMap[colIdx]) {
+                const sortedBindings = [...bindingMap[colIdx]].sort((a, b) => {
+                    if (a.bindToSelf && !b.bindToSelf) return -1;
+                    if (!a.bindToSelf && b.bindToSelf) return 1;
+                    return 0;
+                });
+                sortedBindings.forEach(binding => {
+                    const sourceValue = row[binding.sourceColIdx];
+                    if (sourceValue) {
+                        if (binding.interactionType === 'P') {
+                            const icon = binding.type === 'V' ? '▶' : '👁';
+                            cellHtml += `<div class="binding-action">
+                                <span class="preview-trigger" 
+                                    onclick="showPreview('${escapeJs(sourceValue)}', '${binding.type === 'I' ? 'image' : 'video'}')">
+                                    ${icon} ${escapeHtml(binding.hint)}
+                                </span>
+                            </div>`;
+                        } else if (binding.interactionType === 'D') {
+                            // 从 URL 中提取文件名
+                            let filename = 'download';
+                            try {
+                                const urlPath = new URL(sourceValue).pathname;
+                                filename = urlPath.split('/').pop() || 'download';
+                            } catch (e) {}
+                            const downloadHint = binding.hint || '下载';
+                            cellHtml += `<div class="binding-action">
+                                <span class="download-btn cell-link" onclick="downloadFile('${escapeJs(sourceValue)}', '${escapeJs(filename)}')">
+                                    ⬇ ${escapeHtml(downloadHint)}
+                                </span>
+                            </div>`;
+                        }
+                    }
+                });
+            }
+            
+            return cellHtml;
+        }
+        
+        // 分页功能
+        function updatePagination() {
+            const totalPages = Math.ceil(totalRows / pageSize);
+            document.getElementById('pageInfo').textContent = `第 ${currentPage} / ${totalPages} 页`;
+            document.getElementById('currentPageInfo').textContent = currentPage;
+            document.getElementById('prevBtn').disabled = currentPage <= 1;
+            document.getElementById('nextBtn').disabled = currentPage >= totalPages;
+        }
+        
+        function prevPage() {
+            if (currentPage > 1) {
+                currentPage--;
+                renderData();
+                updatePagination();
+            }
+        }
+        
+        function nextPage() {
+            const totalPages = Math.ceil(totalRows / pageSize);
+            if (currentPage < totalPages) {
+                currentPage++;
+                renderData();
+                updatePagination();
+            }
+        }
+        
+        function changePageSize() {
+            pageSize = parseInt(document.getElementById('pageSizeSelect').value);
+            currentPage = 1;
+            renderData();
+            updatePagination();
+        }
+        
+        // 下载功能（处理跨域）
+        function downloadFile(url, filename) {
+            fetch(url)
+                .then(response => response.blob())
+                .then(blob => {
+                    const blobUrl = window.URL.createObjectURL(blob);
+                    const a = document.createElement('a');
+                    a.href = blobUrl;
+                    a.download = filename || 'download';
+                    document.body.appendChild(a);
+                    a.click();
+                    document.body.removeChild(a);
+                    window.URL.revokeObjectURL(blobUrl);
+                })
+                .catch(err => {
+                    console.error('下载失败:', err);
+                    // 降级：直接打开链接
+                    window.open(url, '_blank');
+                });
+        }
+        
+        // 预览功能
+        function showPreview(url, type) {
+            const modal = document.getElementById('previewModal');
+            const content = document.getElementById('previewContent');
+            
+            if (type === 'image') {
+                content.innerHTML = `<button class="preview-close" onclick="closePreview()">&times;</button>
+                    <img src="${url}" />`;
+            } else if (type === 'video') {
+                content.innerHTML = `<button class="preview-close" onclick="closePreview()">&times;</button>
+                    <video src="${url}" controls autoplay></video>`;
+            }
+            
+            modal.classList.add('active');
+        }
+        
+        function closePreview(event) {
+            if (event && event.target !== event.currentTarget) return;
+            const modal = document.getElementById('previewModal');
+            modal.classList.remove('active');
+            document.getElementById('previewContent').innerHTML = 
+                '<button class="preview-close" onclick="closePreview()">&times;</button>';
+        }
+        
+        // 悬浮预览
+        function showHoverPreview(event, url, type) {
+            const preview = document.getElementById('hoverPreview');
+            
+            if (type === 'I') {
+                preview.innerHTML = `<img src="${url}" />`;
+            } else if (type === 'V') {
+                preview.innerHTML = `<video src="${url}" autoplay muted loop></video>`;
+            } else {
+                preview.innerHTML = `<span>${url}</span>`;
+            }
+            
+            const rect = event.target.getBoundingClientRect();
+            preview.style.left = rect.left + 'px';
+            preview.style.top = (rect.bottom + 8) + 'px';
+            preview.classList.add('active');
+        }
+        
+        function hideHoverPreview() {
+            const preview = document.getElementById('hoverPreview');
+            preview.classList.remove('active');
+        }
+        
+        // 工具函数
+        function escapeHtml(str) {
+            if (str === null || str === undefined) return '';
+            const div = document.createElement('div');
+            div.textContent = str;
+            return div.innerHTML;
+        }
+        
+        function escapeJs(str) {
+            if (str === null || str === undefined) return '';
+            return str.replace(/\\/g, '\\\\').replace(/'/g, "\\'").replace(/"/g, '\\"');
+        }
+        
+        function truncate(str, maxLen) {
+            if (!str || str.length <= maxLen) return escapeHtml(str);
+            return escapeHtml(str.substring(0, maxLen - 3)) + '...';
+        }
+        
+        function isValidUrl(str) {
+            if (!str) return false;
+            return str.startsWith('http://') || str.startsWith('https://');
+        }
+        
+        // 初始化
+        document.addEventListener('DOMContentLoaded', init);
+    </script>
+</body>
+</html>
+
