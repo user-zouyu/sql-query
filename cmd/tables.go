@@ -22,10 +22,14 @@ var tablesCmd = &cobra.Command{
 		}
 
 		if jsonFlag {
+			result := struct {
+				Count  int            `json:"count"`
+				Tables []db.TableInfo `json:"tables"`
+			}{Count: len(tables), Tables: tables}
 			enc := json.NewEncoder(os.Stdout)
 			enc.SetIndent("", "  ")
 			enc.SetEscapeHTML(false)
-			return enc.Encode(tables)
+			return enc.Encode(result)
 		}
 
 		fmt.Printf("Found %d tables:\n", len(tables))
