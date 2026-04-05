@@ -1,0 +1,5 @@
+.worktrees/
+.env
+*.xlsx
+*.html
+sql-query
