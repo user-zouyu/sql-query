@@ -34,11 +34,11 @@ var tablesCmd = &cobra.Command{
 
 		fmt.Printf("Found %d tables:\n", len(tables))
 		for _, t := range tables {
+			comment := ""
 			if t.TableComment != "" {
-				fmt.Printf("  %-30s - %s\n", t.TableName, t.TableComment)
-			} else {
-				fmt.Printf("  %s\n", t.TableName)
+				comment = " - " + t.TableComment
 			}
+			fmt.Printf("  %-30s %8d rows%s\n", t.TableName, t.TableRows, comment)
 		}
 		return nil
 	},

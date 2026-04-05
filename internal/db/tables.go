@@ -6,6 +6,7 @@ import "gorm.io/gorm"
 type TableInfo struct {
 	TableName    string `json:"table_name" gorm:"column:table_name"`
 	TableComment string `json:"table_comment" gorm:"column:table_comment"`
+	TableRows    int64  `json:"table_rows" gorm:"column:table_rows"`
 }
 
 // GetTables lists all base tables in the current database.
@@ -13,7 +14,8 @@ func GetTables(db *gorm.DB) ([]TableInfo, error) {
 	var tables []TableInfo
 	err := db.Raw(`
 		SELECT TABLE_NAME AS table_name,
-		       COALESCE(TABLE_COMMENT, '') AS table_comment
+		       COALESCE(TABLE_COMMENT, '') AS table_comment,
+		       TABLE_ROWS AS table_rows
 		FROM INFORMATION_SCHEMA.TABLES
 		WHERE TABLE_SCHEMA = DATABASE()
 		  AND TABLE_TYPE = 'BASE TABLE'
