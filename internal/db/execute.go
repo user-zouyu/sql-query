@@ -3,6 +3,7 @@ package db
 import (
 	"context"
 	"database/sql"
+	"fmt"
 	"time"
 
 	"gorm.io/gorm"
@@ -28,12 +29,21 @@ func Execute(gormDB *gorm.DB, sqlContent string, timeoutSec int, maxRows int) ([
 		defer cancel()
 	}
 
-	// Start a read-only transaction — MySQL will reject any write operations
+	// Start a read-only transaction — MySQL will reject DML (INSERT/UPDATE/DELETE)
 	tx, err := sqlDB.BeginTx(ctx, &sql.TxOptions{ReadOnly: true})
 	if err != nil {
 		return nil, nil, err
 	}
 	defer tx.Rollback()
+
+	// EXPLAIN pre-check — MySQL's EXPLAIN only supports SELECT/DML, not DDL.
+	// DDL (DROP/ALTER/CREATE/TRUNCATE) causes a syntax error here,
+	// so this blocks DDL at the MySQL parser level, not regex.
+	explainRows, err := tx.QueryContext(ctx, "EXPLAIN "+sqlContent)
+	if err != nil {
+		return nil, nil, fmt.Errorf("SQL 预检失败（可能包含不支持的语句类型）: %w", err)
+	}
+	explainRows.Close()
 
 	rows, err := tx.QueryContext(ctx, sqlContent)
 	if err != nil {
