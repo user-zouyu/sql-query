@@ -4,3 +4,5 @@
 *.html
 sql-query
 .idea/
+*.env
+.env.*
