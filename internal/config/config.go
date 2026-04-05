@@ -10,6 +10,12 @@ import (
 type Config struct {
 	DBDSN        string
 	QueryTimeout int // seconds, default 300
+
+	// S3 configuration (Phase 2)
+	S3AccessKey string
+	S3SecretKey string
+	S3Region    string
+	S3Endpoint  string // optional, for OSS/MinIO compatibility
 }
 
 // Load reads configuration from environment variables.
@@ -17,6 +23,10 @@ func Load() (*Config, error) {
 	cfg := &Config{
 		DBDSN:        os.Getenv("DB_DSN"),
 		QueryTimeout: 300,
+		S3AccessKey:  os.Getenv("S3_ACCESS_KEY"),
+		S3SecretKey:  os.Getenv("S3_SECRET_KEY"),
+		S3Region:     os.Getenv("S3_REGION"),
+		S3Endpoint:   os.Getenv("S3_ENDPOINT"),
 	}
 
 	if cfg.DBDSN == "" {
@@ -32,4 +42,9 @@ func Load() (*Config, error) {
 	}
 
 	return cfg, nil
+}
+
+// HasS3Config checks whether S3 credentials are fully configured.
+func (c *Config) HasS3Config() bool {
+	return c.S3AccessKey != "" && c.S3SecretKey != "" && c.S3Region != ""
 }

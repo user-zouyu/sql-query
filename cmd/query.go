@@ -15,6 +15,7 @@ import (
 	"sql-query/internal/exporter"
 	"sql-query/internal/log"
 	"sql-query/internal/parser"
+	"sql-query/internal/processor"
 )
 
 var (
@@ -85,12 +86,25 @@ var queryCmd = &cobra.Command{
 		// Parse metadata
 		parsedColumns := parser.ParseColumns(columns)
 
-		// Note: S3 presigning is Phase 2 — skipped for now.
+		// S3 presign: replace bucket:key values with presigned URLs
+		urlCount := 0
 		for _, col := range parsedColumns {
 			if col.HasMeta("URL") {
-				log.Warn("发现 [URL] 元数据但 S3 预签名尚未启用 (Phase 2)")
-				break
+				urlCount++
 			}
+		}
+		if urlCount > 0 {
+			if !cfg.HasS3Config() {
+				errutil.Exit(errutil.ExitGenericError, "invalid_argument",
+					"存在 [URL] 元数据但未配置 S3：需要 S3_ACCESS_KEY, S3_SECRET_KEY, S3_REGION", jsonFlag)
+			}
+			log.Info("S3 预签名处理中 (workers: %d)...", workers)
+			processStart := time.Now()
+			if err := processor.Process(cfg, parsedColumns, data, workers); err != nil {
+				errutil.Exit(errutil.ExitGenericError, "s3_presign_failed",
+					fmt.Sprintf("S3 预签名失败: %s", err), jsonFlag)
+			}
+			log.Info("预签名处理完成 (耗时 %v)", time.Since(processStart).Round(time.Millisecond))
 		}
 
 		// Export

@@ -254,6 +254,69 @@ $ echo $?
 | `invalid_argument` | 1 | 参数无效 |
 | `file_error` | 1 | 文件读写失败 |
 | `query_timeout` | 1 | 查询超时 |
+| `s3_presign_failed` | 1 | S3 预签名失败 |
+
+## S3 预签名
+
+当 SQL 列别名包含 `[URL(duration)]` 元数据时，`query` 命令自动将 `bucket:key` 值转换为带时效的预签名 URL。
+
+### 配置
+
+在 `.env` 中添加 S3 凭据（仅在使用 `[URL]` 列时需要）：
+
+```env
+# AWS S3
+S3_ACCESS_KEY=your-aws-access-key
+S3_SECRET_KEY=your-secret-key
+S3_REGION=us-west-1
+
+# 阿里云 OSS（需要 S3_ENDPOINT）
+S3_ACCESS_KEY=LTAI5tXXXXXXXXXXX
+S3_SECRET_KEY=your-secret-key
+S3_REGION=cn-hangzhou
+S3_ENDPOINT=https://oss-cn-hangzhou.aliyuncs.com
+```
+
+### 使用示例
+
+```sql
+-- 数据库中 avatar 列存储格式: bucket:key (如 my-bucket:images/photo.png)
+SELECT
+  username,
+  avatar `[URL(24h)][HTML(I)] 头像`
+FROM users
+```
+
+```bash
+# JSON: 头像字段变为预签名 URL
+echo "SELECT username, avatar \`[URL(24h)] 头像\` FROM users" | \
+  ./sql-query query -e .env --json
+
+# Excel: URL 自动变为可点击的超链接
+echo "SELECT username, avatar \`[URL(24h)] 头像\` FROM users" | \
+  ./sql-query query -e .env --excel -o users.xlsx
+
+# 下载模式: [URL(24h,D)] 触发浏览器下载而非预览
+echo "SELECT file_path \`[URL(24h,D)] 文件\` FROM attachments" | \
+  ./sql-query query -e .env --excel -o files.xlsx
+```
+
+### 并发控制
+
+使用 `-w` 参数控制预签名并发数（默认 CPU 核数）：
+
+```bash
+echo "..." | ./sql-query query -e .env --json -w 4
+```
+
+### 错误处理
+
+任何一个单元格的预签名失败，整个命令退出（exit code 1）：
+
+```bash
+$ echo "SELECT 'bad:key' \`[URL(24h)] f\`" | ./sql-query query -e .env --json 2>/dev/null
+{"error":"s3_presign_failed","message":"S3 预签名失败: 行 0 列 0: ..."}
+```
 
 ## 完整示例
 
