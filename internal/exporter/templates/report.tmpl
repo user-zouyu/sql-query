@@ -408,7 +408,7 @@
             __REPORT_COLUMNS__.forEach((col, colIdx) => {
                 if (col.meta && col.meta.HTML) {
                     const htmlMeta = col.meta.HTML;
-                    const args = htmlMeta.Args || {};
+                    const args = htmlMeta.args || {};
                     
                     // 确定目标列索引
                     let targetColIdx = -1;
@@ -458,7 +458,7 @@
             __REPORT_COLUMNS__.forEach((col, idx) => {
                 // 如果是纯绑定列（有交互绑定到其他列），则隐藏
                 if (col.meta && col.meta.HTML) {
-                    const args = col.meta.HTML.Args || {};
+                    const args = col.meta.HTML.args || {};
                     if (args.bindColumn) {
                         return; // 跳过这列的表头
                     }
@@ -490,7 +490,7 @@
                 __REPORT_COLUMNS__.forEach((col, colIdx) => {
                     // 跳过绑定列
                     if (col.meta && col.meta.HTML) {
-                        const args = col.meta.HTML.Args || {};
+                        const args = col.meta.HTML.args || {};
                         if (args.bindColumn) {
                             return;
                         }
@@ -517,12 +517,12 @@
             const isUrl = isValidUrl(value);
             
             // 检查是否绑定到自己（不渲染原始内容，只显示预览按钮）
-            const isBoundToSelf = col.meta && col.meta.HTML && col.meta.HTML.Args && col.meta.HTML.Args.bindToSelf === 'true';
+            const isBoundToSelf = col.meta && col.meta.HTML && col.meta.HTML.args && col.meta.HTML.args.bindToSelf === 'true';
             
             // 如果不是绑定到自己，则渲染原始内容
             if (!isBoundToSelf) {
                 if (col.meta && col.meta.HTML) {
-                    const args = col.meta.HTML.Args || {};
+                    const args = col.meta.HTML.args || {};
                     const type = args.type || 'T';
                     
                     switch (type) {
@@ -530,7 +530,7 @@
                             // 检查是否有 H 限制，默认高度 100px，宽度不限制
                             let imgHeight = '100px';
                             if (col.meta && col.meta.H) {
-                                const h = col.meta.H.Args || {};
+                                const h = col.meta.H.args || {};
                                 if (h.height) imgHeight = h.height;
                             }
                             let containerStyle = `height:${imgHeight};`;
@@ -544,7 +544,7 @@
                             // 检查是否有 H 限制，默认高度 100px，宽度不限制
                             let videoHeight = '100px';
                             if (col.meta && col.meta.H) {
-                                const h = col.meta.H.Args || {};
+                                const h = col.meta.H.args || {};
                                 if (h.height) videoHeight = h.height;
                             }
                             cellHtml = `<div class="cell-video-container" style="height:${videoHeight};">
@@ -554,7 +554,7 @@
                             break;
                         case 'L':
                             // 检查是否需要下载
-                            const downloadL = col.meta && col.meta.URL && col.meta.URL.Args && col.meta.URL.Args.download === 'true';
+                            const downloadL = col.meta && col.meta.URL && col.meta.URL.args && col.meta.URL.args.download === 'true';
                             if (downloadL) {
                                 let filenameL = 'download';
                                 try {
@@ -571,7 +571,7 @@
                     }
                 } else if (isUrl) {
                     // URL 列自动转换为链接，检查是否需要下载
-                    const downloadUrl = col.meta && col.meta.URL && col.meta.URL.Args && col.meta.URL.Args.download === 'true';
+                    const downloadUrl = col.meta && col.meta.URL && col.meta.URL.args && col.meta.URL.args.download === 'true';
                     if (downloadUrl) {
                         let filenameUrl = 'download';
                         try {
