@@ -10,20 +10,32 @@ import (
 	"sql-query/internal/log"
 )
 
-// Execute runs a SQL query and returns column names and rows.
+// Execute runs a SQL query inside a read-only transaction and returns column names and rows.
+// The read-only transaction (START TRANSACTION READ ONLY) is enforced by MySQL —
+// any write attempt (INSERT/DELETE/DROP etc.) will be rejected by the database engine.
 // Each cell is *string (nil = SQL NULL). timeoutSec <= 0 means no timeout.
 // maxRows <= 0 means no limit.
-func Execute(db *gorm.DB, sqlContent string, timeoutSec int, maxRows int) ([]string, [][]*string, error) {
-	var rows *sql.Rows
-	var err error
-
-	if timeoutSec > 0 {
-		ctx, cancel := context.WithTimeout(context.Background(), time.Duration(timeoutSec)*time.Second)
-		defer cancel()
-		rows, err = db.WithContext(ctx).Raw(sqlContent).Rows()
-	} else {
-		rows, err = db.Raw(sqlContent).Rows()
+func Execute(gormDB *gorm.DB, sqlContent string, timeoutSec int, maxRows int) ([]string, [][]*string, error) {
+	sqlDB, err := gormDB.DB()
+	if err != nil {
+		return nil, nil, err
 	}
+
+	ctx := context.Background()
+	var cancel context.CancelFunc
+	if timeoutSec > 0 {
+		ctx, cancel = context.WithTimeout(ctx, time.Duration(timeoutSec)*time.Second)
+		defer cancel()
+	}
+
+	// Start a read-only transaction — MySQL will reject any write operations
+	tx, err := sqlDB.BeginTx(ctx, &sql.TxOptions{ReadOnly: true})
+	if err != nil {
+		return nil, nil, err
+	}
+	defer tx.Rollback()
+
+	rows, err := tx.QueryContext(ctx, sqlContent)
 	if err != nil {
 		return nil, nil, err
 	}

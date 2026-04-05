@@ -72,7 +72,7 @@ var queryCmd = &cobra.Command{
 				"未提供 SQL 内容，请使用 -f 指定文件或通过 stdin 输入", jsonFlag)
 		}
 
-		// Validate SQL safety
+		// Validate SQL safety — blocks DDL (DROP/ALTER/CREATE) which read-only tx doesn't prevent
 		if err := db.ValidateReadOnly(sqlContent); err != nil {
 			errutil.Exit(errutil.ExitGenericError, "sql_rejected",
 				fmt.Sprintf("SQL 安全校验失败: %s", err), jsonFlag)
