@@ -118,6 +118,29 @@ understand which tables are relevant → inspect schemas → write JOIN query �
 table <name> → check column types and indexes → write targeted SELECT with WHERE → analyze results
 ```
 
+## S3 Presigned URLs
+
+When query columns use `[URL(duration)]` metadata, the tool automatically converts `bucket:key` values to presigned URLs. This requires S3 config in the `.env` file (`S3_ACCESS_KEY`, `S3_SECRET_KEY`, `S3_REGION`, optionally `S3_ENDPOINT` for OSS/MinIO).
+
+When writing SQL that includes S3 file references, use the metadata protocol in column aliases:
+
+```sql
+SELECT
+  username,
+  avatar `[URL(24h)][HTML(I)] 头像`,        -- 24h presigned URL + image preview in HTML
+  resume `[URL(1h,D)] 简历`                  -- 1h presigned URL + download mode
+FROM users
+```
+
+Metadata reference:
+- `[URL(24h)]` — presign with 24h expiry
+- `[URL(15m,D)]` — presign with 15min expiry + browser download mode
+- `[HTML(I)]` — render as image in HTML export
+- `[HTML(V)]` — render as video in HTML export
+- `[H(120px)]` — limit image/video height
+
+The presigning happens automatically before export — no extra steps needed. Use `-w` flag to control concurrency for large datasets.
+
 ## Output Format
 
 Use `--json` for programmatic inspection, `--log-level error` to keep output clean:
@@ -144,3 +167,16 @@ User: "帮我看看有哪些表，然后查一下订单最多的用户"
    LIMIT 10
    ```
 4. Execute and present the results in a readable format
+
+User: "导出用户头像列表，头像要能直接看"
+
+1. Run `table users` to check avatar column
+2. Write SQL with URL metadata:
+   ```sql
+   SELECT username AS 用户名,
+          avatar `[URL(24h)][HTML(I)] 头像`
+   FROM users
+   WHERE avatar IS NOT NULL
+   ```
+3. Export as HTML for preview: `--html -o avatars.html`
+4. Or JSON for AI processing: `--json`
