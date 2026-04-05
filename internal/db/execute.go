@@ -3,11 +3,11 @@ package db
 import (
 	"context"
 	"database/sql"
-	"fmt"
-	"os"
 	"time"
 
 	"gorm.io/gorm"
+
+	"sql-query/internal/log"
 )
 
 // Execute runs a SQL query and returns column names and rows.
@@ -57,7 +57,7 @@ func Execute(db *gorm.DB, sqlContent string, timeoutSec int) ([]string, [][]*str
 
 		rowCount++
 		if rowCount%1000 == 0 {
-			fmt.Fprintf(os.Stderr, "  已读取 %d 行...\n", rowCount)
+			log.Debug("已读取 %d 行...", rowCount)
 		}
 	}
 

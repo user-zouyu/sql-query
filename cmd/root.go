@@ -11,11 +11,13 @@ import (
 	"sql-query/internal/config"
 	"sql-query/internal/db"
 	"sql-query/internal/errutil"
+	"sql-query/internal/log"
 )
 
 var (
 	envFile  string
 	jsonFlag bool
+	logLevel string
 
 	// Shared state set by PersistentPreRunE
 	cfg      *config.Config
@@ -40,6 +42,14 @@ var rootCmd = &cobra.Command{
 			}
 		}
 
+		// Log level: flag > env > default(error)
+		if logLevel == "" {
+			logLevel = os.Getenv("LOG_LEVEL")
+		}
+		if logLevel != "" {
+			log.SetLevel(log.ParseLevel(logLevel))
+		}
+
 		var err error
 		cfg, err = config.Load()
 		if err != nil {
@@ -47,13 +57,13 @@ var rootCmd = &cobra.Command{
 				err.Error(), jsonFlag)
 		}
 
-		fmt.Fprintln(os.Stderr, "连接数据库...")
+		log.Info("连接数据库...")
 		database, err = db.Connect(cfg.DBDSN)
 		if err != nil {
 			errutil.Exit(errutil.ExitConnectFailed, "connection_failed",
 				fmt.Sprintf("数据库连接失败: %s", err), jsonFlag)
 		}
-		fmt.Fprintln(os.Stderr, "数据库连接成功")
+		log.Info("数据库连接成功")
 
 		return nil
 	},
@@ -62,6 +72,7 @@ var rootCmd = &cobra.Command{
 func init() {
 	rootCmd.PersistentFlags().StringVarP(&envFile, "env", "e", "", ".env 配置文件路径")
 	rootCmd.PersistentFlags().BoolVar(&jsonFlag, "json", false, "以 JSON 格式输出")
+	rootCmd.PersistentFlags().StringVar(&logLevel, "log-level", "", "日志级别: debug, info, warn, error (默认 error，可通过 LOG_LEVEL 环境变量设置)")
 }
 
 // Execute runs the root command.

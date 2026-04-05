@@ -13,6 +13,7 @@ import (
 	"sql-query/internal/db"
 	"sql-query/internal/errutil"
 	"sql-query/internal/exporter"
+	"sql-query/internal/log"
 	"sql-query/internal/parser"
 )
 
@@ -70,14 +71,15 @@ var queryCmd = &cobra.Command{
 		}
 
 		// Execute SQL
-		fmt.Fprintln(os.Stderr, "执行 SQL 查询...")
+		log.Info("执行 SQL 查询...")
+		log.Debug("SQL: %s", sqlContent)
 		queryStart := time.Now()
 		columns, data, err := db.Execute(database, sqlContent, cfg.QueryTimeout)
 		if err != nil {
 			errutil.Exit(errutil.ExitGenericError, "sql_syntax_error",
 				fmt.Sprintf("执行 SQL 失败: %s", err), jsonFlag)
 		}
-		fmt.Fprintf(os.Stderr, "查询完成，共 %d 列 %d 行 (耗时 %v)\n",
+		log.Info("查询完成，共 %d 列 %d 行 (耗时 %v)",
 			len(columns), len(data), time.Since(queryStart).Round(time.Millisecond))
 
 		// Parse metadata
@@ -86,7 +88,7 @@ var queryCmd = &cobra.Command{
 		// Note: S3 presigning is Phase 2 — skipped for now.
 		for _, col := range parsedColumns {
 			if col.HasMeta("URL") {
-				fmt.Fprintln(os.Stderr, "警告: 发现 [URL] 元数据但 S3 预签名尚未启用 (Phase 2)")
+				log.Warn("发现 [URL] 元数据但 S3 预签名尚未启用 (Phase 2)")
 				break
 			}
 		}
@@ -94,14 +96,14 @@ var queryCmd = &cobra.Command{
 		// Export
 		var exp exporter.Exporter
 		if excelFlag {
-			fmt.Fprintf(os.Stderr, "导出 Excel -> %s\n", outputFile)
+			log.Info("导出 Excel -> %s", outputFile)
 			exp = exporter.NewExcelExporter(outputFile)
 		} else if htmlFlag {
-			fmt.Fprintf(os.Stderr, "导出 HTML -> %s\n", outputFile)
+			log.Info("导出 HTML -> %s", outputFile)
 			exp = exporter.NewHTMLExporter(outputFile)
 		} else {
 			if outputFile != "" {
-				fmt.Fprintf(os.Stderr, "导出 JSON -> %s\n", outputFile)
+				log.Info("导出 JSON -> %s", outputFile)
 			}
 			exp = exporter.NewJSONExporter(outputFile)
 		}
@@ -111,7 +113,7 @@ var queryCmd = &cobra.Command{
 				fmt.Sprintf("导出失败: %s", err), jsonFlag)
 		}
 
-		fmt.Fprintln(os.Stderr, "完成")
+		log.Info("完成")
 		return nil
 	},
 }
