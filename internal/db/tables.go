@@ -19,5 +19,11 @@ func GetTables(db *gorm.DB) ([]TableInfo, error) {
 		  AND TABLE_TYPE = 'BASE TABLE'
 		ORDER BY TABLE_NAME
 	`).Scan(&tables).Error
-	return tables, err
+	if err != nil {
+		return nil, err
+	}
+	for i := range tables {
+		tables[i].TableComment = FixUTF8(tables[i].TableComment)
+	}
+	return tables, nil
 }

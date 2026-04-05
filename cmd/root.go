@@ -27,6 +27,12 @@ var rootCmd = &cobra.Command{
 	Short: "MySQL 数据库结构查询与 SQL 导出工具",
 	Long:  "sql-query 是一个 CLI 工具，提供 MySQL 数据库结构查询和 SQL 查询导出能力，专为 AI skills 设计。",
 	PersistentPreRunE: func(cmd *cobra.Command, args []string) error {
+		// Skip DB connection for help and completion commands
+		if cmd.Name() == "help" || cmd.Name() == "completion" ||
+			cmd.Flags().Changed("help") {
+			return nil
+		}
+
 		if envFile != "" {
 			if err := godotenv.Load(envFile); err != nil {
 				errutil.Exit(errutil.ExitGenericError, "file_error",

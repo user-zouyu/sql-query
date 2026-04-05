@@ -60,7 +60,7 @@ func GetTableDDL(db *gorm.DB, tableName string) (*TableDDL, error) {
 	if err != nil {
 		return nil, fmt.Errorf("SHOW CREATE TABLE 失败: %w", err)
 	}
-	result.RawDDL = createRow.CreateTable
+	result.RawDDL = FixUTF8(createRow.CreateTable)
 
 	// 2. Columns
 	err = db.Raw(`
@@ -98,7 +98,12 @@ func GetTableDDL(db *gorm.DB, tableName string) (*TableDDL, error) {
 	if err != nil {
 		return nil, fmt.Errorf("查询表注释失败: %w", err)
 	}
-	result.Comment = comment
+	result.Comment = FixUTF8(comment)
+
+	// Fix double-encoded column comments
+	for i := range result.Columns {
+		result.Columns[i].Comment = FixUTF8(result.Columns[i].Comment)
+	}
 
 	return result, nil
 }
