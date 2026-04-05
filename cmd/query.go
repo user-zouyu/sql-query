@@ -24,6 +24,7 @@ var (
 	excelFlag  bool
 	htmlFlag   bool
 	workers    int
+	maxRows    int
 )
 
 var queryCmd = &cobra.Command{
@@ -71,11 +72,17 @@ var queryCmd = &cobra.Command{
 				"未提供 SQL 内容，请使用 -f 指定文件或通过 stdin 输入", jsonFlag)
 		}
 
+		// Validate SQL safety
+		if err := db.ValidateReadOnly(sqlContent); err != nil {
+			errutil.Exit(errutil.ExitGenericError, "sql_rejected",
+				fmt.Sprintf("SQL 安全校验失败: %s", err), jsonFlag)
+		}
+
 		// Execute SQL
 		log.Info("执行 SQL 查询...")
 		log.Debug("SQL: %s", sqlContent)
 		queryStart := time.Now()
-		columns, data, err := db.Execute(database, sqlContent, cfg.QueryTimeout)
+		columns, data, err := db.Execute(database, sqlContent, cfg.QueryTimeout, maxRows)
 		if err != nil {
 			errutil.Exit(errutil.ExitGenericError, "sql_syntax_error",
 				fmt.Sprintf("执行 SQL 失败: %s", err), jsonFlag)
@@ -138,6 +145,7 @@ func init() {
 	queryCmd.Flags().BoolVar(&excelFlag, "excel", false, "导出为 Excel 格式")
 	queryCmd.Flags().BoolVar(&htmlFlag, "html", false, "导出为 HTML 格式")
 	queryCmd.Flags().IntVarP(&workers, "workers", "w", runtime.NumCPU(), "并发处理数")
+	queryCmd.Flags().IntVar(&maxRows, "max-rows", 0, "最大返回行数（0 表示不限制）")
 	rootCmd.AddCommand(queryCmd)
 }
 

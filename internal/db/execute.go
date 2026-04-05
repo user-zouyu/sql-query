@@ -12,7 +12,8 @@ import (
 
 // Execute runs a SQL query and returns column names and rows.
 // Each cell is *string (nil = SQL NULL). timeoutSec <= 0 means no timeout.
-func Execute(db *gorm.DB, sqlContent string, timeoutSec int) ([]string, [][]*string, error) {
+// maxRows <= 0 means no limit.
+func Execute(db *gorm.DB, sqlContent string, timeoutSec int, maxRows int) ([]string, [][]*string, error) {
 	var rows *sql.Rows
 	var err error
 
@@ -58,6 +59,11 @@ func Execute(db *gorm.DB, sqlContent string, timeoutSec int) ([]string, [][]*str
 		rowCount++
 		if rowCount%1000 == 0 {
 			log.Debug("已读取 %d 行...", rowCount)
+		}
+
+		if maxRows > 0 && rowCount >= maxRows {
+			log.Warn("已达到最大行数限制 (%d 行)，结果被截断", maxRows)
+			break
 		}
 	}
 
