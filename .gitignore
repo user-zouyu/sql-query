@@ -2,7 +2,7 @@
 .env
 *.xlsx
 *.html
-sql-query
+/sql-query
 .idea/
 *.env
 .env.*
