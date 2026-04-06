@@ -61,13 +61,17 @@ func ValidateReadOnly(sql string) error {
 	return checkDangerousNodes(stmt)
 }
 
-// checkReadOnly verifies the top-level statement is a read-only SELECT/UNION.
+// checkReadOnly verifies the top-level statement is a read-only SELECT/UNION,
+// or an EXPLAIN wrapping a read-only SELECT/UNION.
 func checkReadOnly(stmt sqlparser.Statement) error {
 	switch node := stmt.(type) {
 	case *sqlparser.Select:
 		return checkSelectSafe(node)
 	case *sqlparser.Union:
 		return checkUnionSafe(node)
+	case *sqlparser.ExplainStmt:
+		// EXPLAIN is allowed only when its inner statement is a read-only SELECT.
+		return checkReadOnly(node.Statement)
 	default:
 		return fmt.Errorf("禁止执行 %s 语句（仅允许 SELECT 查询）", sqlparser.ASTToStatementType(stmt).String())
 	}
