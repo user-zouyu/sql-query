@@ -10,6 +10,7 @@ import (
 
 	"github.com/spf13/cobra"
 
+	"sql-query/internal/audit"
 	"sql-query/internal/db"
 	"sql-query/internal/errutil"
 	"sql-query/internal/exporter"
@@ -72,23 +73,68 @@ var queryCmd = &cobra.Command{
 				"未提供 SQL 内容，请使用 -f 指定文件或通过 stdin 输入", jsonFlag)
 		}
 
+		// Determine output format string for audit
+		outputFormat := "json"
+		if excelFlag {
+			outputFormat = "excel"
+		} else if htmlFlag {
+			outputFormat = "html"
+		}
+
+		// Prepare audit entry
+		dsnInfo := audit.ParseDSN(cfg.DBDSN)
+		entry := &audit.Entry{
+			Timestamp:    time.Now().Format("2006-01-02T15:04:05.000Z07:00"),
+			SQL:          sqlContent,
+			EnvFile:      envFile,
+			Database:     dsnInfo.Database,
+			User:         dsnInfo.User,
+			OutputFormat: outputFormat,
+			OutputFile:   outputFile,
+		}
+		startTime := time.Now()
+
 		// Validate SQL safety — only SELECT/WITH allowed
 		if err := db.ValidateReadOnly(sqlContent); err != nil {
+			entry.Status = "rejected"
+			entry.Error = err.Error()
+			entry.DurationMs = time.Since(startTime).Milliseconds()
+			entry.Validation.L1AST = "rejected"
+			entry.Validation.L1Reason = err.Error()
+			entry.Validation.L2Explain = "skipped"
+			entry.Validation.L3ReadOnly = "skipped"
+			entry.Write(cfg.AuditLogDir)
 			errutil.Exit(errutil.ExitGenericError, "sql_rejected",
 				fmt.Sprintf("SQL 安全校验失败: %s", err), jsonFlag)
 		}
+		entry.Validation.L1AST = "pass"
 
 		// Execute SQL — EXPLAIN pre-check + READ ONLY transaction
 		log.Info("执行 SQL 查询...")
 		log.Debug("SQL: %s", sqlContent)
-		queryStart := time.Now()
 		columns, data, err := db.Execute(database, sqlContent, cfg.QueryTimeout, maxRows)
 		if err != nil {
+			entry.Status = "error"
+			entry.Error = err.Error()
+			entry.DurationMs = time.Since(startTime).Milliseconds()
+			entry.Validation.L2Explain = "error"
+			entry.Validation.L3ReadOnly = "skipped"
+			entry.Write(cfg.AuditLogDir)
 			errutil.Exit(errutil.ExitGenericError, "sql_syntax_error",
 				fmt.Sprintf("执行 SQL 失败: %s", err), jsonFlag)
 		}
+		entry.Validation.L2Explain = "pass"
+		entry.Validation.L3ReadOnly = "pass"
+		entry.Status = "success"
+		entry.Rows = len(data)
+		entry.Columns = len(columns)
+		entry.DurationMs = time.Since(startTime).Milliseconds()
+
 		log.Info("查询完成，共 %d 列 %d 行 (耗时 %v)",
-			len(columns), len(data), time.Since(queryStart).Round(time.Millisecond))
+			len(columns), len(data), time.Since(startTime).Round(time.Millisecond))
+
+		// Write audit log (success)
+		entry.Write(cfg.AuditLogDir)
 
 		// Parse metadata
 		parsedColumns := parser.ParseColumns(columns)
