@@ -72,13 +72,13 @@ var queryCmd = &cobra.Command{
 				"未提供 SQL 内容，请使用 -f 指定文件或通过 stdin 输入", jsonFlag)
 		}
 
-		// Validate SQL safety — code-level keyword check (defense in depth)
+		// Validate SQL safety — only SELECT/WITH allowed
 		if err := db.ValidateReadOnly(sqlContent); err != nil {
 			errutil.Exit(errutil.ExitGenericError, "sql_rejected",
 				fmt.Sprintf("SQL 安全校验失败: %s", err), jsonFlag)
 		}
 
-		// Execute SQL
+		// Execute SQL — EXPLAIN pre-check + READ ONLY transaction
 		log.Info("执行 SQL 查询...")
 		log.Debug("SQL: %s", sqlContent)
 		queryStart := time.Now()

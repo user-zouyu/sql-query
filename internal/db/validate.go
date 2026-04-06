@@ -2,125 +2,148 @@ package db
 
 import (
 	"fmt"
-	"regexp"
 	"strings"
+
+	"vitess.io/vitess/go/vt/sqlparser"
 )
 
-// dangerousKeywords are SQL statement-level keywords that indicate write operations.
-var dangerousKeywords = []string{
-	"INSERT", "UPDATE", "DELETE", "DROP", "ALTER", "TRUNCATE",
-	"CREATE", "REPLACE", "RENAME", "GRANT", "REVOKE",
-	"LOCK", "UNLOCK", "CALL", "LOAD",
+// dangerousFunctions are MySQL functions that can cause DoS or side effects.
+var dangerousFunctions = map[string]struct{}{
+	"sleep":     {},
+	"benchmark": {},
+	"get_lock":  {},
 }
 
-// dangerousPatterns are SQL clause patterns that could cause side effects.
-var dangerousPatterns = []*regexp.Regexp{
-	regexp.MustCompile(`(?i)\bINTO\s+OUTFILE\b`),
-	regexp.MustCompile(`(?i)\bINTO\s+DUMPFILE\b`),
-	regexp.MustCompile(`(?i)\bFOR\s+UPDATE\b`),
-	regexp.MustCompile(`(?i)\bFOR\s+SHARE\b`),
-	regexp.MustCompile(`(?i)\bLOCK\s+IN\s+SHARE\s+MODE\b`),
-}
+// parser is the shared Vitess SQL parser instance.
+var parser = sqlparser.NewTestParser()
 
-// statementKeywordRe matches the first keyword of a SQL statement,
-// skipping leading whitespace, comments, and CTEs (WITH ... AS).
-var statementKeywordRe = regexp.MustCompile(`(?i)^\s*(?:--[^\n]*\n\s*|/\*[\s\S]*?\*/\s*)*(WITH\b|SELECT\b|INSERT\b|UPDATE\b|DELETE\b|DROP\b|ALTER\b|CREATE\b|TRUNCATE\b|REPLACE\b|RENAME\b|GRANT\b|REVOKE\b|LOCK\b|UNLOCK\b|CALL\b|LOAD\b|SET\b|EXPLAIN\b|SHOW\b|DESCRIBE\b|DESC\b)`)
-
-// ValidateReadOnly checks that the SQL is a safe read-only statement.
-// Returns nil if safe, or an error describing why it was rejected.
+// ValidateReadOnly parses the SQL into an AST and verifies it is a safe,
+// read-only SELECT query. Returns nil if safe, or an error describing why
+// it was rejected.
+//
+// Checks performed:
+//   - Only a single statement is allowed
+//   - Statement must be SELECT (including UNION / CTE)
+//   - No locking clauses (FOR UPDATE / FOR SHARE / LOCK IN SHARE MODE)
+//   - No INTO OUTFILE / INTO DUMPFILE
+//   - No dangerous functions (SLEEP, BENCHMARK, GET_LOCK)
+//
+// Note: unquoted non-ASCII identifiers (e.g. SELECT 1 AS 用户名) must use
+// backticks (SELECT 1 AS `用户名`) since the Vitess parser requires it.
 func ValidateReadOnly(sql string) error {
-	trimmed := strings.TrimSpace(sql)
-	if trimmed == "" {
+	sql = strings.TrimSpace(sql)
+	if sql == "" {
 		return fmt.Errorf("SQL 为空")
 	}
 
-	// Find the first statement keyword
-	match := statementKeywordRe.FindStringSubmatch(trimmed)
-	if len(match) < 2 {
-		return fmt.Errorf("无法识别的 SQL 语句类型")
+	// Reject multiple statements (defense in depth — driver also blocks this)
+	pieces, err := parser.SplitStatementToPieces(sql)
+	if err != nil {
+		return fmt.Errorf("SQL 解析失败: %w", err)
+	}
+	if len(pieces) > 1 {
+		return fmt.Errorf("禁止执行多条语句（仅允许单条 SELECT）")
 	}
 
-	keyword := strings.ToUpper(match[1])
+	// Parse into AST — unparseable SQL is rejected (safe default)
+	stmt, err := parser.Parse(sql)
+	if err != nil {
+		return fmt.Errorf("SQL 解析失败: %w", err)
+	}
 
-	// Allow: SELECT, WITH (CTE), EXPLAIN, SHOW, DESCRIBE/DESC
-	switch keyword {
-	case "SELECT", "WITH", "EXPLAIN", "SHOW", "DESCRIBE", "DESC":
-		// OK — continue to pattern checks below
-	case "SET":
-		// Only allow SET NAMES
-		if matched, _ := regexp.MatchString(`(?i)^\s*SET\s+NAMES\b`, trimmed); matched {
-			return nil
-		}
-		return fmt.Errorf("禁止执行 SET 语句（仅允许 SET NAMES）")
+	// Only allow read-only SELECT statements
+	if err := checkReadOnly(stmt); err != nil {
+		return err
+	}
+
+	// Walk the entire AST to check for dangerous functions, lock functions,
+	// and locking/INTO clauses in subqueries
+	return checkDangerousNodes(stmt)
+}
+
+// checkReadOnly verifies the top-level statement is a read-only SELECT/UNION.
+func checkReadOnly(stmt sqlparser.Statement) error {
+	switch node := stmt.(type) {
+	case *sqlparser.Select:
+		return checkSelectSafe(node)
+	case *sqlparser.Union:
+		return checkUnionSafe(node)
 	default:
-		return fmt.Errorf("禁止执行 %s 语句（仅允许 SELECT 查询）", keyword)
+		return fmt.Errorf("禁止执行 %s 语句（仅允许 SELECT 查询）", sqlparser.ASTToStatementType(stmt).String())
 	}
+}
 
-	// Check for dangerous patterns within the query
-	for _, pat := range dangerousPatterns {
-		if pat.MatchString(trimmed) {
-			return fmt.Errorf("SQL 包含不安全的子句: %s", pat.String())
-		}
+// checkSelectSafe checks a single SELECT node for locking and INTO clauses.
+func checkSelectSafe(sel *sqlparser.Select) error {
+	if sel.Lock != sqlparser.NoLock {
+		return fmt.Errorf("禁止使用锁子句: %s", sel.Lock.ToString())
 	}
-
-	// Check for dangerous keywords used as sub-statements (e.g., SELECT ... ; DROP TABLE)
-	// Split by semicolons and check each statement
-	statements := splitStatements(trimmed)
-	for i, stmt := range statements {
-		if i == 0 {
-			continue // first statement already validated above
-		}
-		stmtTrimmed := strings.TrimSpace(stmt)
-		if stmtTrimmed == "" {
-			continue
-		}
-		subMatch := statementKeywordRe.FindStringSubmatch(stmtTrimmed)
-		if len(subMatch) >= 2 {
-			subKeyword := strings.ToUpper(subMatch[1])
-			switch subKeyword {
-			case "SELECT", "WITH", "EXPLAIN", "SHOW", "DESCRIBE", "DESC":
-				// OK
-			default:
-				return fmt.Errorf("禁止在多语句中执行 %s（仅允许 SELECT 查询）", subKeyword)
-			}
-		}
+	if sel.Into != nil {
+		return fmt.Errorf("禁止使用 INTO 子句")
 	}
-
 	return nil
 }
 
-// splitStatements splits SQL by semicolons, respecting quoted strings.
-func splitStatements(sql string) []string {
-	var statements []string
-	var current strings.Builder
-	inSingleQuote := false
-	inDoubleQuote := false
-	inBacktick := false
+// checkUnionSafe recursively validates both sides of a UNION.
+func checkUnionSafe(union *sqlparser.Union) error {
+	if union.Lock != sqlparser.NoLock {
+		return fmt.Errorf("禁止使用锁子句: %s", union.Lock.ToString())
+	}
+	if union.Into != nil {
+		return fmt.Errorf("禁止使用 INTO 子句")
+	}
+	if err := checkTableStmtSafe(union.Left); err != nil {
+		return err
+	}
+	return checkTableStmtSafe(union.Right)
+}
 
-	for i := 0; i < len(sql); i++ {
-		ch := sql[i]
+// checkTableStmtSafe dispatches to the appropriate checker for TableStatement.
+func checkTableStmtSafe(stmt sqlparser.TableStatement) error {
+	switch s := stmt.(type) {
+	case *sqlparser.Select:
+		return checkSelectSafe(s)
+	case *sqlparser.Union:
+		return checkUnionSafe(s)
+	default:
+		return fmt.Errorf("禁止执行 %T 语句（仅允许 SELECT 查询）", stmt)
+	}
+}
 
-		switch {
-		case ch == '\'' && !inDoubleQuote && !inBacktick:
-			inSingleQuote = !inSingleQuote
-			current.WriteByte(ch)
-		case ch == '"' && !inSingleQuote && !inBacktick:
-			inDoubleQuote = !inDoubleQuote
-			current.WriteByte(ch)
-		case ch == '`' && !inSingleQuote && !inDoubleQuote:
-			inBacktick = !inBacktick
-			current.WriteByte(ch)
-		case ch == ';' && !inSingleQuote && !inDoubleQuote && !inBacktick:
-			statements = append(statements, current.String())
-			current.Reset()
-		default:
-			current.WriteByte(ch)
+// checkDangerousNodes walks the entire AST to reject:
+//   - Dangerous functions (SLEEP, BENCHMARK) via *FuncExpr
+//   - Advisory lock functions (GET_LOCK, RELEASE_LOCK, etc.) via *LockingFunc
+//   - Locking clauses in subqueries (FOR UPDATE inside a derived table)
+func checkDangerousNodes(stmt sqlparser.Statement) error {
+	var reason string
+
+	_ = sqlparser.Walk(func(node sqlparser.SQLNode) (bool, error) {
+		switch n := node.(type) {
+		case *sqlparser.FuncExpr:
+			name := strings.ToLower(n.Name.String())
+			if _, bad := dangerousFunctions[name]; bad {
+				reason = fmt.Sprintf("禁止调用危险函数: %s", n.Name.String())
+				return false, nil
+			}
+		case *sqlparser.LockingFunc:
+			reason = fmt.Sprintf("禁止调用锁函数: %s", sqlparser.String(n))
+			return false, nil
+		case *sqlparser.Select:
+			// Catch FOR UPDATE / FOR SHARE in subqueries
+			if n.Lock != sqlparser.NoLock {
+				reason = fmt.Sprintf("禁止使用锁子句: %s", n.Lock.ToString())
+				return false, nil
+			}
+			if n.Into != nil {
+				reason = "禁止使用 INTO 子句"
+				return false, nil
+			}
 		}
-	}
+		return true, nil
+	}, stmt)
 
-	if current.Len() > 0 {
-		statements = append(statements, current.String())
+	if reason != "" {
+		return fmt.Errorf("%s", reason)
 	}
-
-	return statements
+	return nil
 }

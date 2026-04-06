@@ -11,9 +11,9 @@ import (
 	"sql-query/internal/log"
 )
 
-// Execute runs a SQL query inside a read-only transaction and returns column names and rows.
-// The read-only transaction (START TRANSACTION READ ONLY) is enforced by MySQL —
-// any write attempt (INSERT/DELETE/DROP etc.) will be rejected by the database engine.
+// Execute runs a SELECT query inside a read-only transaction with mandatory
+// EXPLAIN pre-check. The EXPLAIN blocks DDL (syntax error) and the read-only
+// transaction blocks DML (Error 1792).
 // Each cell is *string (nil = SQL NULL). timeoutSec <= 0 means no timeout.
 // maxRows <= 0 means no limit.
 func Execute(gormDB *gorm.DB, sqlContent string, timeoutSec int, maxRows int) ([]string, [][]*string, error) {
@@ -36,7 +36,7 @@ func Execute(gormDB *gorm.DB, sqlContent string, timeoutSec int, maxRows int) ([
 	}
 	defer tx.Rollback()
 
-	// EXPLAIN pre-check — MySQL's EXPLAIN only supports SELECT/DML, not DDL.
+	// EXPLAIN pre-check (mandatory) — MySQL's EXPLAIN only supports SELECT/DML, not DDL.
 	// DDL (DROP/ALTER/CREATE/TRUNCATE) causes a syntax error here,
 	// so this blocks DDL at the MySQL parser level, not regex.
 	explainRows, err := tx.QueryContext(ctx, "EXPLAIN "+sqlContent)
