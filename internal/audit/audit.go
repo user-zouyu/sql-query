@@ -12,8 +12,7 @@ import (
 type Validation struct {
 	L1AST      string `json:"l1_ast"`             // pass | rejected
 	L1Reason   string `json:"l1_reason,omitempty"` // rejection reason (if rejected)
-	L2Explain  string `json:"l2_explain"`          // pass | error | skipped
-	L3ReadOnly string `json:"l3_readonly_tx"`      // pass | error | skipped
+	L2ReadOnly string `json:"l2_readonly_tx"`      // pass | error | skipped
 }
 
 // Entry is a single audit log record written as one JSON line.

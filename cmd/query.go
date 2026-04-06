@@ -101,15 +101,14 @@ var queryCmd = &cobra.Command{
 			entry.DurationMs = time.Since(startTime).Milliseconds()
 			entry.Validation.L1AST = "rejected"
 			entry.Validation.L1Reason = err.Error()
-			entry.Validation.L2Explain = "skipped"
-			entry.Validation.L3ReadOnly = "skipped"
+			entry.Validation.L2ReadOnly = "skipped"
 			entry.Write(cfg.AuditLogDir)
 			errutil.Exit(errutil.ExitGenericError, "sql_rejected",
 				fmt.Sprintf("SQL 安全校验失败: %s", err), jsonFlag)
 		}
 		entry.Validation.L1AST = "pass"
 
-		// Execute SQL — EXPLAIN pre-check + READ ONLY transaction
+		// Execute SQL — READ ONLY transaction
 		log.Info("执行 SQL 查询...")
 		log.Debug("SQL: %s", sqlContent)
 		columns, data, err := db.Execute(database, sqlContent, cfg.QueryTimeout, maxRows)
@@ -117,14 +116,12 @@ var queryCmd = &cobra.Command{
 			entry.Status = "error"
 			entry.Error = err.Error()
 			entry.DurationMs = time.Since(startTime).Milliseconds()
-			entry.Validation.L2Explain = "error"
-			entry.Validation.L3ReadOnly = "skipped"
+			entry.Validation.L2ReadOnly = "error"
 			entry.Write(cfg.AuditLogDir)
 			errutil.Exit(errutil.ExitGenericError, "sql_syntax_error",
 				fmt.Sprintf("执行 SQL 失败: %s", err), jsonFlag)
 		}
-		entry.Validation.L2Explain = "pass"
-		entry.Validation.L3ReadOnly = "pass"
+		entry.Validation.L2ReadOnly = "pass"
 		entry.Status = "success"
 		entry.Rows = len(data)
 		entry.Columns = len(columns)
