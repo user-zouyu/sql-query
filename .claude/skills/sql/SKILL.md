@@ -37,11 +37,10 @@ If `SQL_QUERY_ENV` is not set, ask the user for the `.env` file path before proc
 
 This skill operates in **read-only mode**. This is non-negotiable — the database may be a production system and a single write could cause real damage.
 
-The `sql-query` CLI enforces read-only access through three defense layers:
+The `sql-query` CLI enforces read-only access through two defense layers:
 
-1. **L1 — Vitess AST validation**: parses SQL into a syntax tree. Only `SELECT` and `WITH` (CTE) statements are allowed. The AST walker rejects dangerous patterns anywhere in the tree, including subqueries and CASE expressions. This is immune to comment injection and encoding tricks.
-2. **L2 — EXPLAIN pre-check**: sends `EXPLAIN <sql>` before execution. DDL (CREATE/DROP/ALTER) triggers a MySQL syntax error and is blocked.
-3. **L3 — READ ONLY transaction**: executes the query inside `START TRANSACTION READ ONLY`. DML (INSERT/UPDATE/DELETE) and locking clauses (FOR UPDATE) are rejected by the MySQL engine (Error 1792).
+1. **L1 — Vitess AST validation**: parses SQL into a syntax tree. Only `SELECT`, `WITH` (CTE), and `EXPLAIN SELECT` statements are allowed. The AST walker rejects dangerous patterns anywhere in the tree, including subqueries and CASE expressions. This is immune to comment injection and encoding tricks.
+2. **L2 — READ ONLY transaction**: executes the query inside `START TRANSACTION READ ONLY`. DML (INSERT/UPDATE/DELETE) and locking clauses (FOR UPDATE) are rejected by the MySQL engine (Error 1792).
 
 **Blocked by L1 AST validation:**
 - Non-SELECT statements: `INSERT`, `UPDATE`, `DELETE`, `DROP`, `ALTER`, `TRUNCATE`, `CREATE`, `REPLACE`, `RENAME`, `GRANT`, `REVOKE`, `LOCK`, `UNLOCK`, `CALL`, `LOAD`, `SET`, `SHOW`, `DESCRIBE`, `EXPLAIN`
@@ -64,6 +63,8 @@ SELECT username AS `用户名` FROM users
 If the user asks to modify data, explain that this skill is read-only and suggest they use other tools for write operations.
 
 **Never include passwords, DSN strings, or credentials in your responses.** The `.env` file handles all authentication.
+
+**NEVER read .env files.** Do not use `cat`, `Read`, `Bash`, or any tool to view the contents of `.env`, `.env.*`, or any file that may contain `DB_DSN`, passwords, or credentials. Only pass the `.env` file path to the `sql-query` CLI via the `-e` flag — never inspect its contents.
 
 ## Workflow
 
