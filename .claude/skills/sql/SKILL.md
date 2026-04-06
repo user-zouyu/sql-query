@@ -1,12 +1,12 @@
 ---
-name: sql
+name: sql-query
 description: |
-  Safe SQL query skill for MySQL databases. Triggered by /sql command.
+  Safe SQL query skill for MySQL databases. Triggered by /sql-query command.
   Use this skill when the user wants to query a MySQL database, explore table structures,
   write SQL, or export query results. The skill enforces read-only access — only SELECT
   queries are allowed. It uses the sql-query CLI tool under the hood.
   
-  TRIGGER when: user types /sql, asks to "query the database", "show me the tables",
+  TRIGGER when: user types /sql-query, asks to "query the database", "show me the tables",
   "write a SQL query", "look up data in MySQL", "export query results",
   "what tables do we have", "show me the schema", or any database exploration request.
 invocation: user
