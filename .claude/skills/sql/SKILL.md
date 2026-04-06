@@ -37,11 +37,29 @@ If `SQL_QUERY_ENV` is not set, ask the user for the `.env` file path before proc
 
 This skill operates in **read-only mode**. This is non-negotiable — the database may be a production system and a single write could cause real damage.
 
-**Before executing any SQL, validate it:**
+The `sql-query` CLI enforces read-only access through three defense layers:
 
-1. Parse the SQL and reject anything that is not a SELECT or WITH (CTE) statement
-2. Specifically block these keywords at the statement level: `INSERT`, `UPDATE`, `DELETE`, `DROP`, `ALTER`, `TRUNCATE`, `CREATE`, `REPLACE`, `RENAME`, `GRANT`, `REVOKE`, `LOCK`, `UNLOCK`, `CALL`, `LOAD`, `SET` (except `SET NAMES`)
-3. Also block: `INTO OUTFILE`, `INTO DUMPFILE`, `FOR UPDATE`, `FOR SHARE`, `LOCK IN SHARE MODE`
+1. **L1 — Vitess AST validation**: parses SQL into a syntax tree. Only `SELECT` and `WITH` (CTE) statements are allowed. The AST walker rejects dangerous patterns anywhere in the tree, including subqueries and CASE expressions. This is immune to comment injection and encoding tricks.
+2. **L2 — EXPLAIN pre-check**: sends `EXPLAIN <sql>` before execution. DDL (CREATE/DROP/ALTER) triggers a MySQL syntax error and is blocked.
+3. **L3 — READ ONLY transaction**: executes the query inside `START TRANSACTION READ ONLY`. DML (INSERT/UPDATE/DELETE) and locking clauses (FOR UPDATE) are rejected by the MySQL engine (Error 1792).
+
+**Blocked by L1 AST validation:**
+- Non-SELECT statements: `INSERT`, `UPDATE`, `DELETE`, `DROP`, `ALTER`, `TRUNCATE`, `CREATE`, `REPLACE`, `RENAME`, `GRANT`, `REVOKE`, `LOCK`, `UNLOCK`, `CALL`, `LOAD`, `SET`, `SHOW`, `DESCRIBE`, `EXPLAIN`
+- Locking clauses: `FOR UPDATE`, `FOR SHARE`, `LOCK IN SHARE MODE` (including in subqueries)
+- File operations: `INTO OUTFILE`, `INTO DUMPFILE`
+- DoS functions: `SLEEP()`, `BENCHMARK()`, `GET_LOCK()` (including nested in subqueries/CASE)
+- Multi-statement injection: `SELECT 1; DROP TABLE x`
+- MySQL conditional comment injection: `/*!50000 INSERT ... */`
+
+**Important — Chinese aliases require backticks:**
+The Vitess SQL parser does not support unquoted non-ASCII identifiers. Always use backticks for Chinese aliases:
+```sql
+-- ✗ Will be rejected (parse error)
+SELECT username AS 用户名 FROM users
+
+-- ✓ Correct
+SELECT username AS `用户名` FROM users
+```
 
 If the user asks to modify data, explain that this skill is read-only and suggest they use other tools for write operations.
 
@@ -75,7 +93,7 @@ Based on the table structure and the user's question, write a SELECT query. Thin
 - **Appropriate JOINs**: check foreign key patterns from column names (e.g., `user_id` → `users.id`)
 - **Useful indexes**: prefer queries that can use existing indexes (check the indexes output)
 - **Reasonable LIMITs**: always add `LIMIT` for exploratory queries to avoid pulling the entire table. Default to `LIMIT 100` unless the user asks for everything
-- **Chinese column aliases**: if table comments are in Chinese, use Chinese aliases for readability
+- **Chinese column aliases**: if table comments are in Chinese, use backtick-quoted Chinese aliases for readability (e.g. `` `用户名` ``)
 
 Show the SQL to the user and explain what it does before executing.
 
@@ -159,11 +177,11 @@ User: "帮我看看有哪些表，然后查一下订单最多的用户"
 2. Run `table users` and `table orders` to understand the schema
 3. Write and show the SQL:
    ```sql
-   SELECT u.username AS 用户名, u.email AS 邮箱, COUNT(o.id) AS 订单数
+   SELECT u.username AS `用户名`, u.email AS `邮箱`, COUNT(o.id) AS `订单数`
    FROM users u
    JOIN orders o ON u.id = o.user_id
    GROUP BY u.id
-   ORDER BY 订单数 DESC
+   ORDER BY `订单数` DESC
    LIMIT 10
    ```
 4. Execute and present the results in a readable format
@@ -173,7 +191,7 @@ User: "导出用户头像列表，头像要能直接看"
 1. Run `table users` to check avatar column
 2. Write SQL with URL metadata:
    ```sql
-   SELECT username AS 用户名,
+   SELECT username AS `用户名`,
           avatar `[URL(24h)][HTML(I)] 头像`
    FROM users
    WHERE avatar IS NOT NULL
