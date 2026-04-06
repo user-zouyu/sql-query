@@ -16,6 +16,7 @@ type Config struct {
 	S3SecretKey string
 	S3Region    string
 	S3Endpoint  string // optional, for OSS/MinIO compatibility
+	AuditLogDir string // audit log directory, default "."
 }
 
 // Load reads configuration from environment variables.
@@ -27,6 +28,7 @@ func Load() (*Config, error) {
 		S3SecretKey:  os.Getenv("S3_SECRET_KEY"),
 		S3Region:     os.Getenv("S3_REGION"),
 		S3Endpoint:   os.Getenv("S3_ENDPOINT"),
+		AuditLogDir:  os.Getenv("AUDIT_LOG_DIR"),
 	}
 
 	if cfg.DBDSN == "" {
