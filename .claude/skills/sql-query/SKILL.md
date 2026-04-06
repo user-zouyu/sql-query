@@ -4,6 +4,7 @@ description: |
   Safe SQL query skill for MySQL databases. Only triggered by /sql-query command.
   Read-only access — only SELECT queries are allowed. Uses the sql-query CLI tool.
 invocation: user
+disable-model-invocation: true
 ---
 
 # SQL Query Skill
