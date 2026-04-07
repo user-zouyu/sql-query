@@ -103,30 +103,35 @@ curl -sL "https://raw.githubusercontent.com/user-zouyu/sql-query/main/.env.examp
 
 ### 全局安装
 
-告知用户手动配置：
+使用 `AskUserQuestion` tool 询问用户配置方式：
 
-> **下一步：配置数据库连接**
->
-> 1. 在安全位置创建 `.env` 文件，参考格式：
+- 问题：`如何配置数据库连接？`
+- 选项 1：`在项目目录下创建 .env.{name}（推荐）` — skill 会自动发现当前目录的 .env.* 文件
+- 选项 2：`指定 SQL_QUERY_ENV 环境变量` — 在 ~/.claude/settings.json 中配置固定路径
+
+**选项 1：项目目录 .env.{name}（推荐）**
+
+下载 `.env.example` 到当前项目目录：
+
+```bash
+curl -sL "https://raw.githubusercontent.com/user-zouyu/sql-query/main/.env.example" -o .env.example
+```
+
+告知用户：
+
+> 已创建 `.env.example` 模板。请复制为 `.env.{name}` 并填写数据库连接信息：
 >
 > ```bash
-> # 数据库连接（必填）
-> DB_DSN=user:password@tcp(127.0.0.1:3306)/dbname?charset=utf8mb4&parseTime=True&loc=Local
->
-> # 查询超时（秒，默认 300）
-> # QUERY_TIMEOUT=300
->
-> # S3 预签名配置（仅在使用 [URL] 元数据时需要）
-> # S3_ACCESS_KEY=your-access-key
-> # S3_SECRET_KEY=your-secret-key
-> # S3_REGION=us-west-1
-> # S3_ENDPOINT=https://oss-cn-hangzhou.aliyuncs.com
->
-> # 审计日志目录（默认当前目录）
-> # AUDIT_LOG_DIR=/var/log/sql-query
+> cp .env.example .env.prod
 > ```
 >
-> 2. 设置环境变量 `SQL_QUERY_ENV` 指向该文件。可以在 `~/.claude/settings.json` 中配置：
+> 使用 `/sql-query` 时会自动发现 `.env.*` 文件供你选择。
+
+**选项 2：指定 SQL_QUERY_ENV**
+
+告知用户：
+
+> 在安全位置创建 `.env` 文件（参考 [.env.example](https://raw.githubusercontent.com/user-zouyu/sql-query/main/.env.example)），然后在 `~/.claude/settings.json` 中配置：
 >
 > ```json
 > {
