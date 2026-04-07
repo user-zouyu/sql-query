@@ -34,7 +34,16 @@ fi
 SQL_ENV="${SQL_QUERY_ENV}"
 ```
 
-If `SQL_QUERY_ENV` is not set, ask the user for the `.env` file path before proceeding.
+If `SQL_QUERY_ENV` is not set, auto-discover `.env` files in the current directory:
+
+```bash
+# List .env.* files (NOT .env itself — it may contain secrets for other services)
+ls .env.* 2>/dev/null
+```
+
+If `.env.{name}` files are found (e.g. `.env.prod`, `.env.dev`), present them to the user and ask which one to use. **Do NOT read the file contents** — only list filenames and let the user choose. Then set `SQL_ENV` to the chosen file path.
+
+If no `.env.*` files are found, ask the user for the `.env` file path before proceeding.
 
 ## Safety Rules
 
