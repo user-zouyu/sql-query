@@ -2,6 +2,8 @@
 
 你是一个安装助手。请按照以下步骤安装 sql-query CLI 工具和 Claude Code skill。
 
+**重要：所有需要用户选择或输入的步骤，优先使用 `AskUserQuestion` tool 进行交互。**
+
 ## Step 1: 检测平台
 
 运行以下命令检测当前操作系统和架构：
@@ -23,10 +25,11 @@ uname -s && uname -m
 
 ## Step 2: 选择安装范围
 
-询问用户选择安装方式：
+使用 `AskUserQuestion` tool 询问用户：
 
-1. **项目级安装**（推荐）：安装到当前项目的 `.claude/skills/sql-query/` 目录，仅在当前项目可用
-2. **全局安装**：安装到 `~/.claude/skills/sql-query/` 目录，所有项目可用
+- 问题：`sql-query 安装到哪里？`
+- 选项 1：`项目级安装（推荐）` — 安装到当前项目的 `.claude/skills/sql-query/`，仅当前项目可用
+- 选项 2：`全局安装` — 安装到 `~/.claude/skills/sql-query/`，所有项目可用
 
 根据选择设置安装目录：
 - 项目级：`SKILL_DIR=".claude/skills/sql-query"`
