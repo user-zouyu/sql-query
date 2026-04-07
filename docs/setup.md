@@ -87,10 +87,23 @@ curl -sL "https://raw.githubusercontent.com/user-zouyu/sql-query/main/.claude/sk
 
 **下一步：配置数据库连接**
 
-创建 `.env` 文件（放在项目目录或其他安全位置）：
+参考 [.env.example](https://raw.githubusercontent.com/user-zouyu/sql-query/main/.env.example) 创建 `.env` 文件（放在项目目录或其他安全位置）：
 
-```
-DB_DSN=user:password@tcp(host:3306)/database?charset=utf8mb4
+```bash
+# 数据库连接（必填）
+DB_DSN=user:password@tcp(127.0.0.1:3306)/dbname?charset=utf8mb4&parseTime=True&loc=Local
+
+# 查询超时（秒，默认 300）
+# QUERY_TIMEOUT=300
+
+# S3 预签名配置（仅在使用 [URL] 元数据时需要）
+# S3_ACCESS_KEY=your-access-key
+# S3_SECRET_KEY=your-secret-key
+# S3_REGION=us-west-1
+# S3_ENDPOINT=https://oss-cn-hangzhou.aliyuncs.com
+
+# 审计日志目录（默认当前目录）
+# AUDIT_LOG_DIR=/var/log/sql-query
 ```
 
 然后设置环境变量 `SQL_QUERY_ENV` 指向该文件。可以在 `.claude/settings.json` 中配置：

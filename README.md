@@ -22,10 +22,23 @@ Claude 会自动检测你的平台，下载 CLI 二进制并配置 skill。
 
 ### 配置数据库
 
-创建 `.env` 文件：
+参考 [.env.example](.env.example) 创建 `.env` 文件：
 
-```
-DB_DSN=user:password@tcp(host:3306)/database?charset=utf8mb4
+```bash
+# 数据库连接（必填）
+DB_DSN=user:password@tcp(127.0.0.1:3306)/dbname?charset=utf8mb4&parseTime=True&loc=Local
+
+# 查询超时（秒，默认 300）
+# QUERY_TIMEOUT=300
+
+# S3 预签名配置（仅在使用 [URL] 元数据时需要）
+# S3_ACCESS_KEY=your-access-key
+# S3_SECRET_KEY=your-secret-key
+# S3_REGION=us-west-1
+# S3_ENDPOINT=https://oss-cn-hangzhou.aliyuncs.com
+
+# 审计日志目录（默认当前目录）
+# AUDIT_LOG_DIR=/var/log/sql-query
 ```
 
 在 `.claude/settings.json` 中设置：
