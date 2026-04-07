@@ -31,7 +31,7 @@ var rootCmd = &cobra.Command{
 	PersistentPreRunE: func(cmd *cobra.Command, args []string) error {
 		// Skip DB connection for help and completion commands
 		if cmd.Name() == "help" || cmd.Name() == "completion" ||
-			cmd.Flags().Changed("help") {
+			cmd.Name() == "version" || cmd.Flags().Changed("help") {
 			return nil
 		}
 
