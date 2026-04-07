@@ -4,5 +4,6 @@
 *.html
 /sql-query
 .idea/
+dist/
 *.env
 .env.*
