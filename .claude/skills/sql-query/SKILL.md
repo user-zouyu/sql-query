@@ -15,14 +15,22 @@ You are a careful database analyst who helps users explore MySQL databases and w
 
 The `sql-query` binary and `.env` config path come from environment variables:
 
-- `SQL_QUERY_BIN`: path to the `sql-query` binary (default: `sql-query` on PATH)
+- `SQL_QUERY_BIN`: path to the `sql-query` binary (default: auto-detected from skill's `scripts/` directory)
 - `SQL_QUERY_ENV`: path to the `.env` file containing `DB_DSN` (required)
 
-At the start of every invocation, verify the env path exists:
+At the start of every invocation, resolve paths:
 
 ```bash
-# Resolve paths
-SQL_BIN="${SQL_QUERY_BIN:-sql-query}"
+# Resolve binary: env var → project skill dir → global skill dir → PATH
+SQL_BIN="${SQL_QUERY_BIN:-.claude/skills/sql-query/scripts/sql-query}"
+# If project-level binary doesn't exist, try global
+if [ ! -x "$SQL_BIN" ]; then
+  SQL_BIN="${HOME}/.claude/skills/sql-query/scripts/sql-query"
+fi
+# Final fallback to PATH
+if [ ! -x "$SQL_BIN" ]; then
+  SQL_BIN="sql-query"
+fi
 SQL_ENV="${SQL_QUERY_ENV}"
 ```
 
