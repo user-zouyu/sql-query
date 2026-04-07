@@ -76,47 +76,74 @@ curl -sL "https://raw.githubusercontent.com/user-zouyu/sql-query/main/.claude/sk
 
 预期输出类似：`sql-query 0.0.2-beta (commit: xxx, built: xxx)`
 
-## Step 7: 安装完成
+## Step 7: 配置数据库连接
 
-安装成功后，向用户展示以下信息：
+根据 Step 2 的安装范围，执行不同的配置流程：
 
----
+### 项目级安装
 
-**sql-query 安装完成！**
-
-**安装位置：**
-- CLI: `${SKILL_DIR}/scripts/sql-query`
-- Skill: `${SKILL_DIR}/SKILL.md`
-
-**下一步：配置数据库连接**
-
-参考 [.env.example](https://raw.githubusercontent.com/user-zouyu/sql-query/main/.env.example) 创建 `.env` 文件（放在项目目录或其他安全位置）：
+直接在项目根目录创建 `.env.example` 文件：
 
 ```bash
-# 数据库连接（必填）
-DB_DSN=user:password@tcp(127.0.0.1:3306)/dbname?charset=utf8mb4&parseTime=True&loc=Local
-
-# 查询超时（秒，默认 300）
-# QUERY_TIMEOUT=300
-
-# S3 预签名配置（仅在使用 [URL] 元数据时需要）
-# S3_ACCESS_KEY=your-access-key
-# S3_SECRET_KEY=your-secret-key
-# S3_REGION=us-west-1
-# S3_ENDPOINT=https://oss-cn-hangzhou.aliyuncs.com
-
-# 审计日志目录（默认当前目录）
-# AUDIT_LOG_DIR=/var/log/sql-query
+curl -sL "https://raw.githubusercontent.com/user-zouyu/sql-query/main/.env.example" -o .env.example
 ```
 
-然后设置环境变量 `SQL_QUERY_ENV` 指向该文件。可以在 `.claude/settings.json` 中配置：
+然后告知用户：
 
-```json
-{
-  "env": {
-    "SQL_QUERY_ENV": "/path/to/.env"
-  }
-}
-```
+> 已创建 `.env.example` 模板文件。请复制为 `.env.{name}`（如 `.env.prod`、`.env.dev`）并填写数据库连接信息：
+>
+> ```bash
+> cp .env.example .env.prod
+> ```
+>
+> 编辑 `.env.prod`，将 `DB_DSN` 修改为实际的数据库连接字符串。
+> **注意：请勿将 `.env.prod` 等包含密码的文件提交到 git。**
+>
+> 配置完成后，使用 `/sql-query` 命令时会自动发现 `.env.*` 文件供你选择。
 
-配置完成后，在 Claude Code 中使用 `/sql-query` 命令即可开始查询数据库。
+### 全局安装
+
+告知用户手动配置：
+
+> **下一步：配置数据库连接**
+>
+> 1. 在安全位置创建 `.env` 文件，参考格式：
+>
+> ```bash
+> # 数据库连接（必填）
+> DB_DSN=user:password@tcp(127.0.0.1:3306)/dbname?charset=utf8mb4&parseTime=True&loc=Local
+>
+> # 查询超时（秒，默认 300）
+> # QUERY_TIMEOUT=300
+>
+> # S3 预签名配置（仅在使用 [URL] 元数据时需要）
+> # S3_ACCESS_KEY=your-access-key
+> # S3_SECRET_KEY=your-secret-key
+> # S3_REGION=us-west-1
+> # S3_ENDPOINT=https://oss-cn-hangzhou.aliyuncs.com
+>
+> # 审计日志目录（默认当前目录）
+> # AUDIT_LOG_DIR=/var/log/sql-query
+> ```
+>
+> 2. 设置环境变量 `SQL_QUERY_ENV` 指向该文件。可以在 `~/.claude/settings.json` 中配置：
+>
+> ```json
+> {
+>   "env": {
+>     "SQL_QUERY_ENV": "/path/to/.env"
+>   }
+> }
+> ```
+
+## Step 8: 安装完成
+
+向用户展示：
+
+> **sql-query 安装完成！**
+>
+> **安装位置：**
+> - CLI: `${SKILL_DIR}/scripts/sql-query`
+> - Skill: `${SKILL_DIR}/SKILL.md`
+>
+> 配置完成后，在 Claude Code 中使用 `/sql-query` 命令即可开始查询数据库。
